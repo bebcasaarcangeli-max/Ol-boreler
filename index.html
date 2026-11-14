@@ -36,7 +36,29 @@ items=items.filter(o=>o.y<H+20);draw();if(feedback>0){shout();feedback-=dt}hud()
 function draw(){river();for(let o of items)obstacle(o);drawPlayer()}
 function audioReady(){try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;if(!audioCtx)audioCtx=new AC();if(audioCtx.state==='suspended')audioCtx.resume();return audioCtx}catch(e){return null}}
 function tone(freq,duration,volume=0.025,type='square',when=0){try{const a=audioReady();if(!a)return;const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(freq,a.currentTime+when);g.gain.setValueAtTime(0.0001,a.currentTime+when);g.gain.exponentialRampToValueAtTime(volume,a.currentTime+when+0.015);g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+when+duration);o.connect(g);g.connect(a.destination);o.start(a.currentTime+when);o.stop(a.currentTime+when+duration+0.03)}catch(e){}}
-function startMusic(){try{if(musicTimer)clearInterval(musicTimer);let step=0;const notes=[392,494,587,494,440,523,659,523,392,494,587,784,659,587,494,440];musicTimer=setInterval(()=>{if(!audioOn)return;tone(notes[step%notes.length],0.13,0.018,'square');if(step%4===0)tone(notes[step%notes.length]/2,0.16,0.012,'triangle');step++},170)}catch(e){}}
+// Partitura chiptune originale: 2 battute in loop, 8-bit a 132 BPM.
+function startMusic(){
+ try{
+  if(musicTimer)clearInterval(musicTimer);
+  let step=0;
+  const lead=[659,null,659,784,880,null,784,659,587,null,587,659,784,null,659,null,
+              523,null,523,659,784,null,659,587,494,null,494,587,659,null,587,null];
+  const bass=[165,null,null,165,196,null,null,196,147,null,null,147,196,null,null,196,
+              131,null,null,131,165,null,null,165,147,null,null,147,196,null,null,196];
+  const beat=60000/132/4;
+  musicTimer=setInterval(()=>{
+   if(!audioOn)return;
+   const n=step%32;
+   if(lead[n])tone(lead[n],0.105,0.022,'square');
+   if(bass[n])tone(bass[n],0.14,0.025,'triangle');
+   // Colpi ritmici sintetici, senza campioni o file audio.
+   if(n%4===0)tone(82,0.055,0.035,'square');
+   else if(n%8===4)tone(220,0.035,0.012,'square');
+   if(n%8===2||n%8===6)tone(1200,0.025,0.006,'square');
+   step++;
+  },beat);
+ }catch(e){}
+}
 function laugh(){try{const a=audioReady();if(!a)return;[0,1,2,3,4,5].forEach((n)=>{const t=n*0.105;const freq=520+(n%2)*130;tone(freq,0.085,0.045,'square',t);tone(freq*1.5,0.06,0.012,'triangle',t+0.015)})}catch(e){}}
 $('audio').addEventListener('click',()=>{audioOn=!audioOn;$('audio').textContent='AUDIO: '+(audioOn?'ON':'OFF');$('audio').setAttribute('aria-pressed',String(audioOn));if(audioOn){audioReady();startMusic()}else{if(musicTimer)clearInterval(musicTimer);musicTimer=null}});
 function setHold(v){held=v}

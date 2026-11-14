@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#102b2a"><title>Ol Boréler</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#102b2a;color:#f4e8c7;font-family:monospace;display:flex;min-height:100svh;align-items:center;justify-content:center;padding:12px}
+main{width:min(100%,440px);text-align:center}h1{font-size:clamp(25px,7vw,38px);letter-spacing:3px;margin:5px 0;color:#f5d47b}p{margin:4px 0 10px;font-size:12px}
+.hud{display:flex;justify-content:space-between;padding:8px 12px;background:#1c4540;border:3px solid #d5b879;font-size:14px}
+canvas{display:block;width:100%;height:auto;max-height:68svh;aspect-ratio:3/5;background:#286b67;border:4px solid #d5b879;image-rendering:pixelated;touch-action:none}
+.controls{display:flex;gap:12px;margin-top:10px}.controls button,#start{flex:1;background:#d5b879;color:#18312c;border:0;padding:14px;font:bold 18px monospace;touch-action:none;border-radius:4px}
+#start{width:100%;margin-top:9px;font-size:15px}.hint{font-size:10px;opacity:.8;margin-top:8px}
+</style></head>
+<body><main><h1>OL BORÉLER</h1><p>LA CORSA SULL'ACQUA</p>
+<div class="hud"><span>PUNTI <b id="score">0</b></span><span>VITE <b id="lives">3</b></span><span>RECORD <b id="best">0</b></span></div>
+<canvas id="game" width="240" height="400" aria-label="Gioco Ol Boréler"></canvas>
+<div class="controls"><button id="left" aria-label="Sinistra">◀</button><button id="right" aria-label="Destra">▶</button></div>
+<button id="start">INIZIA LA DISCESA</button><div class="hint">Usa i pulsanti o le frecce della tastiera. Schiva sassi, tronchi e rapide!</div>
+</main>
+<script>
+(()=>{
+const c=document.getElementById('game'),x=c.getContext('2d'),W=240,H=400;
+const $=id=>document.getElementById(id);let player=120,held=0,items=[],score=0,lives=3,best=+(localStorage.olBorelerBest||0),speed=1,spawn=0,running=false,last=0,water=0,raf=0;
+$('best').textContent=best;
+function river(){x.fillStyle='#286b67';x.fillRect(0,0,W,H);x.fillStyle='#347f78';for(let i=0;i<9;i++){let y=(i*57+water)%H;x.fillRect(18+(i%3)*5,y,3,18);x.fillRect(190-(i%4)*5,(y+23)%H,3,13)}x.fillStyle='#d4bd83';x.fillRect(0,0,12,H);x.fillRect(228,0,12,H);x.fillStyle='#967c50';for(let y=0;y<H;y+=18){x.fillRect(3,(y+water)%H,6,8);x.fillRect(231,(y+water)%H,6,8)}}
+function drawPlayer(){x.fillStyle='#583c28';x.fillRect(player-17,335,34,9);x.fillStyle='#b98245';x.fillRect(player-12,328,24,12);x.fillStyle='#e5c18a';x.fillRect(player-6,313,12,15);x.fillStyle='#33291f';x.fillRect(player-8,307,16,7);x.fillStyle='#f5d47b';x.fillRect(player-2,317,3,3)}
+function obstacle(o){x.fillStyle=o.type===0?'#77766b':o.type===1?'#70472d':'#b7a16d';if(o.type===0){x.fillRect(o.x-10,o.y-8,20,16);x.fillRect(o.x-7,o.y-12,14,4)}else if(o.type===1){x.fillRect(o.x-20,o.y-5,40,10);x.fillStyle='#493322';x.fillRect(o.x-16,o.y-2,32,3)}else{x.fillRect(o.x-20,o.y-7,40,14);x.fillStyle='#e5d6a7';x.fillRect(o.x-15,o.y-2,30,3)}}
+function hud(){$('score').textContent=Math.floor(score);$('lives').textContent=lives;$('best').textContent=best}
+function reset(){player=120;items=[];score=0;lives=3;speed=1;spawn=0;running=true;$('start').textContent='RICOMINCIA';last=0;hud();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
+function loop(t){if(!running)return;let dt=Math.min((t-last)/16.67||1,2);last=t;score+=dt*speed*.12;speed=Math.min(3.3,1+score/260);water=(water+2.2*speed*dt)%H;spawn-=dt;if(spawn<=0){let lane=28+Math.random()*184;items.push({x:lane,y:-20,type:Math.floor(Math.random()*3),hit:false});spawn=Math.max(19,48-speed*9)+Math.random()*20}
+player=Math.max(25,Math.min(215,player+held*2.9*dt*speed));
+for(let o of items){o.y+=2.2*speed*dt;if(!o.hit&&o.y>315&&o.y<355&&Math.abs(o.x-player)<(o.type===1?27:22)){o.hit=true;lives--;hud();if(lives<=0){running=false;best=Math.max(best,Math.floor(score));localStorage.olBorelerBest=best;hud();$('start').textContent='RIPROVA';draw();x.fillStyle='rgba(0,0,0,.72)';x.fillRect(25,160,190,75);x.fillStyle='#f5d47b';x.textAlign='center';x.font='bold 17px monospace';x.fillText('DISCESA FINITA',120,190);x.font='12px monospace';x.fillText('PUNTI: '+Math.floor(score),120,214);return}}}
+items=items.filter(o=>o.y<H+20);draw();hud();raf=requestAnimationFrame(loop)}
+function draw(){river();for(let o of items)obstacle(o);drawPlayer()}
+function setHold(v){held=v}
+[['left',-1],['right',1]].forEach(([id,v])=>{let b=$(id);b.addEventListener('pointerdown',e=>{e.preventDefault();setHold(v)});['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>{if(held===v)setHold(0)}))});
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setHold(e.key==='ArrowLeft'?-1:1)}if(e.key===' '&&!running)reset()});addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight')setHold(0)});
+$('start').addEventListener('click',reset);draw();})();
+</script></body></html>

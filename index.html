@@ -8,17 +8,19 @@
 main{width:min(100%,440px);text-align:center}h1{font-size:clamp(25px,7vw,38px);letter-spacing:3px;margin:5px 0;color:#f5d47b}p{margin:4px 0 10px;font-size:12px}
 .hud{display:flex;justify-content:space-between;padding:8px 12px;background:#1c4540;border:3px solid #d5b879;font-size:14px}
 canvas{display:block;width:100%;height:auto;max-height:68svh;aspect-ratio:3/5;background:#286b67;border:4px solid #d5b879;image-rendering:pixelated;touch-action:none}
-.controls{display:flex;gap:12px;margin-top:10px}.controls button,#start{flex:1;background:#d5b879;color:#18312c;border:0;padding:14px;font:bold 18px monospace;touch-action:none;border-radius:4px}
-#start{width:100%;margin-top:9px;font-size:15px}.hint{font-size:10px;opacity:.8;margin-top:8px}
+.controls{display:flex;gap:12px;margin-top:10px}.controls button,#start,#audio{flex:1;background:#d5b879;color:#18312c;border:0;padding:14px;font:bold 18px monospace;touch-action:none;border-radius:4px}
+#start{width:100%;margin-top:9px;font-size:15px}#audio{display:block;width:100%;margin-top:7px;background:#315b50;color:#f4e8c7;border:2px solid #d5b879;padding:9px;font:bold 12px monospace;border-radius:4px}.volume{display:flex;align-items:center;gap:10px;margin-top:7px;padding:7px 10px;background:#1c4540;border:2px solid #d5b879;font:bold 11px monospace}.volume input{flex:1;min-width:0;accent-color:#f5d47b}.volume output{width:34px;text-align:right}.hint{font-size:10px;opacity:.8;margin-top:8px}
 </style></head>
 <body><main><h1>OL BORÉLER</h1><p>LA CORSA SULL'ACQUA</p>
 <div class="hud"><span>PUNTI <b id="score">0</b></span><span>VITE <b id="lives">3</b></span><span>RECORD <b id="best">0</b></span></div>
 <canvas id="game" width="240" height="400" aria-label="Gioco Ol Boréler"></canvas>
 <div class="controls"><button id="left" aria-label="Sinistra">◀</button><button id="right" aria-label="Destra">▶</button></div>
-<button id="start">INIZIA LA DISCESA</button><div class="hint">Usa i pulsanti o le frecce della tastiera. Schiva sassi, tronchi e rapide!</div>
+<button id="start">INIZIA LA DISCESA</button><button id="audio" aria-pressed="false">AUDIO: OFF</button><label class="volume" for="volume">VOLUME <input id="volume" type="range" min="0" max="100" value="65"><output id="volumeValue">65%</output></label><div class="hint">Usa i pulsanti o le frecce della tastiera. Schiva sassi, tronchi e rapide!</div>
 </main>
-<script>
+<script type="module">
+import { createSidEngine } from "./audio-engine.js";
 (()=>{
+const sid = createSidEngine();
 const c=document.getElementById('game'),x=c.getContext('2d'),W=240,H=400;
 const $=id=>document.getElementById(id);let player=120,held=0,items=[],score=0,lives=3,best=+(localStorage.olBorelerBest||0),speed=1,spawn=0,running=false,last=0,water=0,raf=0,feedback=0;
 $('best').textContent=best;
@@ -31,9 +33,16 @@ function hud(){$('score').textContent=Math.floor(score);$('lives').textContent=l
 function reset(){player=120;items=[];score=0;lives=3;speed=1;spawn=0;feedback=0;running=true;$('start').textContent='RICOMINCIA';last=0;hud();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
 function loop(t){if(!running)return;let dt=Math.min((t-last)/16.67||1,2);last=t;score+=dt*speed*.12;speed=Math.min(3.3,1+score/260);water=(water+2.2*speed*dt)%H;spawn-=dt;if(spawn<=0){let lane=28+Math.random()*184;items.push({x:lane,y:-20,type:Math.floor(Math.random()*3),hit:false});spawn=Math.max(19,48-speed*9)+Math.random()*20}
 player=Math.max(25,Math.min(215,player+held*2.9*dt*speed));
-for(let o of items){o.y+=2.2*speed*dt;if(!o.hit&&o.y>315&&o.y<355&&Math.abs(o.x-player)<(o.type===1?27:22)){o.hit=true;lives--;feedback=75;hud();if(lives<=0){running=false;best=Math.max(best,Math.floor(score));localStorage.olBorelerBest=best;hud();$('start').textContent='RIPROVA';draw();shout();x.fillStyle='#fff8df';x.textAlign='center';x.font='bold 10px monospace';x.fillText('DISCESA FINITA  -  PUNTI '+Math.floor(score),120,246);return}}}
+for(let o of items){o.y+=2.2*speed*dt;if(!o.hit&&o.y>315&&o.y<355&&Math.abs(o.x-player)<(o.type===1?27:22)){o.hit=true;sid.collision();lives--;feedback=75;hud();if(lives<=0){running=false;best=Math.max(best,Math.floor(score));localStorage.olBorelerBest=best;hud();$('start').textContent='RIPROVA';draw();shout();x.fillStyle='#fff8df';x.textAlign='center';x.font='bold 10px monospace';x.fillText('DISCESA FINITA  -  PUNTI '+Math.floor(score),120,246);return}}}
 items=items.filter(o=>o.y<H+20);draw();if(feedback>0){shout();feedback-=dt}hud();raf=requestAnimationFrame(loop)}
 function draw(){river();for(let o of items)obstacle(o);drawPlayer()}
+$('audio').addEventListener('click',async()=>{
+ const on=await sid.toggle();
+ $('audio').textContent='AUDIO: '+(on?'ON':'OFF');
+ $('audio').setAttribute('aria-pressed',String(on));
+});
+$('volume').addEventListener('input',e=>{sid.setVolume(e.target.value/100);$('volumeValue').textContent=e.target.value+'%'});
+sid.setVolume(0.65);
 function setHold(v){held=v}
 [['left',-1],['right',1]].forEach(([id,v])=>{let b=$(id);b.addEventListener('pointerdown',e=>{e.preventDefault();setHold(v)});['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>{if(held===v)setHold(0)}))});
 addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setHold(e.key==='ArrowLeft'?-1:1)}if(e.key===' '&&!running)reset()});addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight')setHold(0)});

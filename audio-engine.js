@@ -1,7 +1,7 @@
 // SID-inspired 8-bit sound engine for OL BORÉLER.
 // Original JavaScript implementation: no MIDI, samples, external libraries or audio files.
 export function createSidEngine() {
-  let context = null, enabled = false, timer = null, nextStepTime = 0, step = 0, noiseBuffer = null;
+  let context = null, master = null, enabled = false, timer = null, nextStepTime = 0, step = 0, noiseBuffer = null, volume = 0.65;
   const bpm = 132, stepDuration = 60 / bpm / 4, lookAhead = 0.12;
   const lead = [76,null,76,79,81,null,79,76,74,null,74,76,79,null,76,null,72,null,72,76,79,null,76,74,71,null,71,74,76,null,74,null];
   const counter = [null,64,null,67,null,67,null,64,null,62,null,66,null,66,null,62,null,60,null,64,null,64,null,60,null,59,null,62,null,62,null,59];
@@ -13,6 +13,7 @@ export function createSidEngine() {
       const Audio = window.AudioContext || window.webkitAudioContext;
       if (!Audio) return null;
       context = new Audio();
+      master = context.createGain(); master.gain.value = volume; master.connect(context.destination);
       const length = Math.floor(context.sampleRate * 0.18);
       noiseBuffer = context.createBuffer(1, length, context.sampleRate);
       const data = noiseBuffer.getChannelData(0);
@@ -30,7 +31,7 @@ export function createSidEngine() {
     gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
     gain.gain.setValueAtTime(volume, Math.max(start + 0.012, start + duration * 0.72));
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    osc.connect(gain); gain.connect(context.destination);
+    osc.connect(gain); gain.connect(master);
     osc.start(start); osc.stop(start + duration + 0.015);
   }
   function noise(start, duration, volume) {
@@ -38,7 +39,7 @@ export function createSidEngine() {
     const source = context.createBufferSource(), filter = context.createBiquadFilter(), gain = context.createGain();
     source.buffer = noiseBuffer; filter.type = "lowpass"; filter.frequency.setValueAtTime(1800, start);
     gain.gain.setValueAtTime(volume, start); gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    source.connect(filter); filter.connect(gain); gain.connect(context.destination);
+    source.connect(filter); filter.connect(gain); gain.connect(master);
     source.start(start); source.stop(start + duration);
   }
   function schedule(at, index) {
@@ -75,5 +76,5 @@ export function createSidEngine() {
     [74,69,72,65,67,60].forEach((note, i) => voice(hz(note), now + i * 0.085, 0.075, "square", 0.07, hz(note - 3)));
     noise(now + 0.43, 0.12, 0.08);
   }
-  return { async toggle() { return enabled ? (off(), false) : await on(); }, collision, isEnabled: () => enabled, stop: off };
+  return { async toggle() { return enabled ? (off(), false) : await on(); }, collision, isEnabled: () => enabled, setVolume(value) { volume = Math.max(0, Math.min(1, Number(value))); if (master && context) master.gain.setTargetAtTime(volume, context.currentTime, 0.025); }, stop: off };
 }
